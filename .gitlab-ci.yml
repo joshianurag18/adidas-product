@@ -1,0 +1,214 @@
+---
+image: mhart/alpine-node:12.20
+
+variables:
+  CI_PROJECT_NAME: "master-data-service"
+  YAMLLINT_INPUT: ".gitlab-ci.yml"
+  HELM_PATH: "deployment/charts/${CI_PROJECT_NAME}"
+  DOCKER_BUILD_ARG: "--build-arg NPM_USERNAME --build-arg NPM_TOKEN"
+  HELM_RELEASE_NAME: "${CI_PROJECT_NAME}"
+  DC_TARGET_LANG: "node"
+  VERACODE_ZIP: "true"
+  VERACODE_INCLUDE: "src/* *.js *.json"
+  VERACODE_EXCLUDE: "src/**/__mocks__/*.js src/**/__tests__/*.js"
+
+stages:
+  - build-cache
+  - lint
+  - test
+  - build
+  - audit
+  - deploy
+
+
+################################
+# build-cache
+################################
+build-cache:
+  stage: build-cache
+  cache:
+    key:
+      files:
+        - package.json
+        - package-lock.json
+    paths:
+      - .npm/
+  before_script:
+    - |
+      npm config set \
+      @falabella-gitlab:registry=https://gitlab.com/api/v4/packages/npm/
+    - npm config set //gitlab.com/api/v4/packages/npm/:_authToken=$NPM_TOKEN
+    - |
+    - npm config set \
+      //gitlab.com/api/v4/projects/23294368/packages/npm/:_authToken=$NPM_TOKEN
+
+  script:
+    - npm ci --cache .npm --prefer-offline --no-audit
+  artifacts:
+    paths:
+      - node_modules
+    expire_in: 45 mins
+  tags:
+    - catalyst-docker-runner
+
+
+
+################################
+# build
+################################
+build:
+  stage: build
+  tags:
+    - dind-build
+
+  services:
+    - docker:19.03.14-dind
+
+  variables:
+    DOCKER_HOST: tcp://127.0.0.1:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
+  before_script:
+    - |
+      i=0; while [ "$i" -lt 12 ]; \
+      do docker info && break; \
+      sleep 5; i=$(( i + 1 )) ; done
+    - |
+      docker --config ./ login \
+             -u "$GRP_CI_TOKEN" \
+             -p "$GRP_CI_PASSWORD" $CI_REGISTRY
+    - |
+      docker --config ./ build $DOCKER_BUILD_ARG \
+             -t $CI_REGISTRY_IMAGE:${CI_COMMIT_SHA:0:8} .
+
+  script:
+    - ""
+
+  after_script:
+    - docker --config ./ push $CI_REGISTRY_IMAGE
+
+
+################################
+# unit-tests
+################################
+unit_tests:
+  stage: test
+  dependencies:
+    - build-cache
+  image: node:14.15.1-alpine3.12
+  script:
+    - npm run test:unit
+  coverage: /^All files[^|]*\|[^|]*\s+([\d\.]+)/
+
+
+################################
+# integration-tests
+################################
+integration_tests:
+  stage: test
+  dependencies:
+    - build-cache
+  image: node:14.15.1-alpine3.12
+  script:
+    - npm run test:integration
+  coverage: /^All files[^|]*\|[^|]*\s+([\d\.]+)/
+
+################################
+# lint
+################################ 
+lint:
+ stages:
+  - lint
+
+ variables:
+  YAMLLINT_OPTS: ""
+  YAMLLINT_INPUT: "."
+
+ yaml:
+  stage: lint
+  image: sdesbure/yamllint
+  script:
+    - yamllint ${YAMLLINT_OPTS} ${YAMLLINT_INPUT}
+
+  stage: lint
+  dependencies:
+    - build-cache
+  script:
+    - npm run lint
+
+################################
+# audit
+################################    
+clair-analysis-dev:
+  stage: audit
+  image:
+    name: registry.gitlab.com/falabella-gitlab/ci-reuse/docker-images/clair-tool:v2.3-2.4.0
+    entrypoint: [""]
+  before_script:
+    - export SCAN_IMAGE="${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA:0:8}"
+    - export REGISTRY_USER='gitlab-ci-token'
+    - export REGISTRY_PASSWORD="${CI_BUILD_TOKEN}"
+  variables:
+    CLAIR_URL: http://clair-secaas.buffetcloud.io:6060
+    REGISTRY_USER: $REGISTRY_USER
+    REGISTRY_PASSWORD: $REGISTRY_PASSWORD
+    BUSINESS_ID: $BUSINESS_ID
+    SECAAS_PLUGIN_ID: $SECAAS_PLUGIN_ID
+    SECAAS_PLUGIN_SECRET: $SECAAS_PLUGIN_SECRET
+    SCAN_IMAGE: $SCAN_IMAGE
+  script:
+    - entrypoint clair-tool
+  allow_failure: true
+  except:
+    - master
+    - staging
+
+
+################################
+# environment: dev
+################################
+
+deploy_dev:
+  extends: .helm_deploy
+  stage: deploy
+  environment:
+    name: dev
+  variables:
+    K8_CLUSTER_NAME: ${K8_CLUSTER_NAME}
+    K8_CLUSTER_REGION: ${K8_CLUSTER_REGION}
+    K8_NAMESPACE: ${K8_NAMESPACE}
+    HELM_RELEASE_NAME: ${CI_PROJECT_NAME}
+    HELM_OPTS: --set-string image.pullSecret.registry=${CI_REGISTRY}
+      --set-string image.pullSecret.username=${CI_DEPLOY_USER}
+      --set-string image.pullSecret.password=${CI_DEPLOY_PASSWORD}
+      --set-string environmentVariables.PROJECT_ID=${GCP_PROJECT_ID}
+      --values deployment/charts/config/values-${CI_ENVIRONMENT_NAME}.yaml
+  only:
+    - master
+  tags:
+    - catalyst-docker-runner
+
+################################
+# environment: staging
+################################
+deploy_staging:
+  extends: .helm_deploy
+  stage: deploy
+  environment:
+    name: staging
+  variables:
+    K8_CLUSTER_NAME: ${K8_CLUSTER_NAME}
+    K8_CLUSTER_REGION: ${K8_CLUSTER_REGION}
+    K8_NAMESPACE: ${K8_NAMESPACE}
+    HELM_RELEASE_NAME: ${CI_PROJECT_NAME}
+    HELM_OPTS: --set-string image.pullSecret.registry=${CI_REGISTRY}
+      --set-string image.pullSecret.username=${CI_DEPLOY_USER}
+      --set-string image.pullSecret.password=${CI_DEPLOY_PASSWORD}
+      --set-string environmentVariables.PROJECT_ID=${GCP_PROJECT_ID}
+      --values deployment/charts/config/values-${CI_ENVIRONMENT_NAME}.yaml
+  only:
+    - master
+    - tags
+  when: manual
