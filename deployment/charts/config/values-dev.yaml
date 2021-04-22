@@ -1,0 +1,31 @@
+image:
+  repository: registry.gitlab.com/falabella-gitlab/catalyst/core/platform-services/development/product-service
+replicaCount: 1
+
+ingress:
+  enabled: true
+  uriPrefix: /catalog/
+  hosts:
+    - dev.adidas.services
+
+containers:
+  port: 4444
+
+environment:
+  name: dev
+
+pod:
+  initialDelaySeconds: 30
+
+gcp:
+  enabled: true
+
+database:
+  enabled: true
+
+environmentVariables:
+  NODE_ENV: "dev"
+
+service:
+  type: ClusterIP
+  port: 80

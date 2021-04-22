@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "name" . }}
+  labels:
+    app: {{ .Chart.Name }}-{{ .Values.image.tag }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ template "name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      release: {{ template "name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}-{{ .Values.image.tag }}
+        release: {{ template "name" . }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4444"
+        prometheus.io/scheme: "https"
+        prometheus.io/path: "/metrics"
+     #   sidecar.istio.io/proxyCPU: 20m
+     #   sidecar.istio.io/proxyMemory: 50M
+    spec:
+      {{- if .Values.image.pullSecret.enabled }}
+      imagePullSecrets:
+      - name: {{ template "name" . }}-registry-auth
+      {{- end }}
+      {{- if .Values.gcp.enabled }}
+      volumes:
+        - name: gcp
+          secret:
+            secretName: {{ template "name" . }}-gcp-auth
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.gcp.enabled }}
+          volumeMounts:
+            - name: gcp
+              mountPath: "/etc/gcp"
+              readOnly: true
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containers.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: {{ .Values.containers.port }}
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.containers.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+          {{- range $key, $value := .Values.environmentVariables }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.database.enabled }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "name" . }}-db-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "name" . }}-db-secrets
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "name" . }}-db-secrets
+                  key: DB_HOST
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "name" . }}-db-secrets
+                  key: DB_NAME
+            {{- end }}
+            {{- if .Values.gcp.enabled }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/gcp/gcp_credentials.json
+            {{- end -}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

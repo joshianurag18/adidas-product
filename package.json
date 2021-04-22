@@ -1,0 +1,87 @@
+{
+  "name": "master-data-service",
+  "version": "1.0.0",
+  "description": "Service for sodimac checkout",
+  "main": "index.js",
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ajv": "^6.10.2",
+    "ajv-errors": "^1.0.1",
+    "ajv-keywords": "^3.4.1",
+    "axios": "^0.21.1",
+    "context": "^1.1.3",
+    "dotenv": "^8.2.0",
+    "faker": "^5.5.3",
+    "fastify": "^3.14.2",
+    "fastify-cors": "^2.2.0",
+    "fastify-env": "^1.0.1",
+    "fastify-oas": "^2.7.2",
+    "fastify-routes": "^2.0.3",
+    "http-status-codes": "^1.4.0",
+    "jwt-decode": "^2.2.0",
+    "knex": "^0.19.2",
+    "knex-stringcase": "^1.3.0",
+    "make-promises-safe": "^5.0.0",
+    "path-to-regexp": "^6.2.0",
+    "pg": "^8.2.1",
+    "randomstring": "^1.1.5"
+  },
+  "engines": {
+    "node": ">=10.*"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^14.1.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-prettier": "^3.1.3",
+    "fs-extra": "^8.1.0",
+    "husky": "^3.1.0",
+    "inquirer": "^7.0.3",
+    "jest": "^24.7.1",
+    "lint-staged": "^10.1.7",
+    "nock": "^11.9.1",
+    "nodemon": "^2.0.4",
+    "pino-pretty": "^2.6.0",
+    "prettier": "^2.0.5"
+  },
+  "eslintIgnore": [
+    "node_modules/*",
+    "coverage/*",
+    ".nyc_output/*"
+  ],
+  "jest": {
+    "clearMocks": true,
+    "collectCoverage": true,
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node"
+  },
+  "scripts": {
+    "lint": "eslint . -c .eslintrc.json --ext js",
+    "lint:fix": "npm run lint -- --fix",
+    "dev": "NODE_ENV=dev nodemon -e js src/index | pino-pretty -c -t HH:MM:ss.l",
+    "start": "node --max-http-header-size 24000 src/index",
+    "test": "LOG_LEVEL=silent jest -c jest.config.unit.js",
+    "knex": "node -r dotenv/config ./node_modules/.bin/knex",
+    "migrate:make": "npm run knex -- migrate:make --knexfile ./config/knexConfig.js",
+    "migrate": "npm run knex -- migrate:latest --knexfile ./config/knexConfig.js",
+    "migrate:down": "npm run knex -- migrate:down --knexfile ./config/knexConfig.js",
+    "test:integration": "LOG_LEVEL=silent NODE_ENV=test jest -c jest.config.integration.js"
+  },
+  "lint-staged": {
+    "*.js": [
+      "npm run lint:fix"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged --allow-empty",
+      "pre-push": "npm test"
+    }
+  }
+}

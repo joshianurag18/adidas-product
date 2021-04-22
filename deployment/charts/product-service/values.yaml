@@ -1,0 +1,103 @@
+# Default values for catalyst_orders.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+environment:
+  name: dev
+baseUrl: http://localhost:10001
+
+replicaCount: 1
+version: v1
+
+autoscaling:
+  enabled: false
+
+image:
+  repository: r.fala.cl/catalyst/core/platform-services/development/master-data-service
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecret:
+    enabled: true
+    registry: https://hub.docker.com
+    username: username
+    password: password
+
+service:
+  type: ClusterIP
+  port: 80
+  canary:
+    name: beta
+    enabled: false
+
+containers:
+  port: 4444
+
+ingress:
+  enabled: false
+  annotations:
+    {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  uriPrefix: /catalog/
+  hosts:
+    - "test.services"
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+egress:
+  enabled: false
+  
+
+pod:
+  initialDelaySeconds: 15
+
+resources:
+  {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+jwt_policy: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+environmentVariables: {}
+  #JWT_ISSUER: "https://accounts.google.com"
+  #JWT_URI: "https://www.googleapis.com/oauth2/v3/certs"
+  #jwt_policy_enabled: true
+
+gcp:
+  enabled: false
+
+database:
+  enabled: false
+
+urls: {}
+
+destinationPolicy:
+  maxConnections: 6000
+  http1MaxPendingRequests: 1024
+  maxRequestsPerConnection: 10
+  consecutiveErrors: 7
+  interval: 1s
+  baseEjectionTime: 5m
+  maxEjectionPercent: 10
+
+SERVICE_URL: dummy-service-url
+
+secret:
+  enabled: false
+
+
