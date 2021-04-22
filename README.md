@@ -88,8 +88,7 @@ Below mention major NPM packages are used.
 "fastify-routes": "^2.0.3",
 "fastify-swagger": "^4.6.0",
 "http-status-codes": "^1.4.0",
-"jwt-decode": "^2.2.0",
-"knex": "^0.19.2"
+"jwt-decode": "^2.2.0"
 "knex-stringcase": "^1.3.0",
 "make-promises-safe": "^5.0.0",
 "path-to-regexp": "^6.2.0",
