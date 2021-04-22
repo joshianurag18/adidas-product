@@ -148,9 +148,6 @@ Run All Tests:
 To start service on your local machine you may use
     $ npm run start
 
-To see swagger docs
-    http://localhost:4444/documentation
-
 To run lint fixing you may use
     $ npm run link:fix
 
